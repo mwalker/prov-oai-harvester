@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
- <responseDate xmlns="http://www.openarchives.org/OAI/2.0/">2024-10-11T21:52:06Z</responseDate>
+ <responseDate xmlns="http://www.openarchives.org/OAI/2.0/">2024-10-11T22:02:41Z</responseDate>
  <request xmlns="http://www.openarchives.org/OAI/2.0/" verb="ListRecords" metadataPrefix="rif">http://metadata.prov.vic.gov.au/oai/query</request>
  <ListRecords>
   <record xmlns="http://www.openarchives.org/OAI/2.0/">
