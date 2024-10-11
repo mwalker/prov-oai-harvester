@@ -1,0 +1,18 @@
+# bundler
+.bundle
+vendor
+
+# Get whatever versions are appropriate where we build
+Gemfile.lock
+
+# vim
+*.swp
+
+# macOS
+.DS_Store
+
+# aider
+.aider*
+
+# byebug
+.byebug_history

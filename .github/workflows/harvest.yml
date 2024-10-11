@@ -1,0 +1,49 @@
+name: Harvest PROV OAI data
+
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+  - cron: '42 7 * * 6'
+
+jobs:
+  oai-harvester:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.3
+        bundler-cache: true
+    - name: Harvest PROV OAI Data
+      run: |
+        bundle exec ruby harvest-prov-oai.rb --split
+    - name: Generate commit message
+      run: |
+        echo "$(date -u)" > /tmp/commit.txt
+        echo "" >> /tmp/commit.txt
+        uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-series.json" "prov-oai-series-$(date -I).json" >> /tmp/commit.txt
+        echo "" >> /tmp/commit.txt
+        uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-agencies.json" "prov-oai-agencies-$(date -I).json" >> /tmp/commit.txt
+        echo "" >> /tmp/commit.txt
+        uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-functions.json" "prov-oai-functions-$(date -I).json" >> /tmp/commit.txt
+    - name: Update data
+      run: |
+        mv "prov-oai-agencies-$(date -I).json" "prov-oai-agencies.json"
+        mv "prov-oai-functions-$(date -I).json" "prov-oai-functions.json"
+        mv "prov-oai-series-$(date -I).json" "prov-oai-series.json"
+        mv "prov-oai-agencies-$(date -I).xml" "prov-oai-agencies.xml"
+        mv "prov-oai-functions-$(date -I).xml" "prov-oai-functions.xml"
+        mv "prov-oai-series-$(date -I).xml" "prov-oai-series.xml"
+    - name: Commit and push
+      run: |
+        git config user.name "Automated"
+        git config user.email "actions@users.noreply.github.com"
+        git add -A
+        git commit -F /tmp/commit.txt || exit 0
+        git pull --rebase
+        git push
+
+
