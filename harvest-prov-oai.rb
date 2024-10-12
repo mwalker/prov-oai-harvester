@@ -1,19 +1,20 @@
 # frozen_string_literal: true
 
 require 'uri'
-require 'nokogiri'
 require 'json'
 require 'date'
 require 'fileutils'
 require 'optparse'
+require 'nokogiri'
 require 'open-uri'
+require 'reverse_markdown'
+
 require 'byebug'
 
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 OAI_PMH_SCHEMA_URL = 'http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd'
 
 class OAIHarvester
-
   attr_reader :raw_responses
 
   def initialize(base_url, request_interval = 1)
@@ -52,7 +53,7 @@ class OAIHarvester
       batch_size = xml.xpath('//oai:record', 'oai' => 'http://www.openarchives.org/OAI/2.0/').size
       total_records += batch_size
 
-      xml.xpath('//oai:record', 'oai' => 'http://www.openarchives.org/OAI/2.0/').each_with_index do |record, index|
+      xml.xpath('//oai:record', 'oai' => 'http://www.openarchives.org/OAI/2.0/').each_with_index do |record, _index|
         records << parse_record(record)
       end
       print "Processed request #{request_count}: #{batch_size}/#{total_records} processed records"
@@ -103,14 +104,14 @@ class OAIHarvester
 
   def parse_record(record)
     rif = record.at_xpath('.//rif:registryObject', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')
+    raw_description = rif.at_xpath('.//rif:description[@type="full"]', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')&.text
+    # Clean the simple HTML markup to text and elimate spaces at the end of lines
+    description = ReverseMarkdown.convert(raw_description).gsub(/[^\S\n]+$/, '').chomp('')
     {
       identifier: record.at_xpath('.//oai:identifier', 'oai' => 'http://www.openarchives.org/OAI/2.0/')&.text,
       datestamp: record.at_xpath('.//oai:datestamp', 'oai' => 'http://www.openarchives.org/OAI/2.0/')&.text,
-      key: rif.at_xpath('./rif:key', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')&.text,
-      originatingSource: rif.at_xpath('./rif:originatingSource', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')&.text,
-      type: rif.at_xpath('./rif:collection/@type', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')&.value,
       title: rif.at_xpath('.//rif:name/rif:namePart', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')&.text,
-      description: rif.at_xpath('.//rif:description[@type="full"]', 'rif' => 'http://ands.org.au/standards/rif-cs/registryObjects')&.text
+      description: description
     }
   end
 end
@@ -179,7 +180,6 @@ def build_xml(responses, filename, prefix = nil)
   root.add_child(response_date.dup) if response_date
   root.add_child(request.dup) if request
 
-
   # Collect all records from all responses
   all_records = []
   responses.each do |response|
@@ -224,14 +224,14 @@ def validate_xml(filename)
     puts "Successfully loaded OAI-PMH schema from #{OAI_PMH_SCHEMA_URL}"
   rescue SocketError, OpenURI::HTTPError => e
     puts "Failed to load OAI-PMH schema: #{e.message}"
-    puts "Skipping validation."
+    puts 'Skipping validation.'
     return
   end
 
   errors = schema.validate(doc)
 
   errors.reject! do |error|
-    # FIXME this also seems to be an issue with the raw XML, so ignore it for now
+    # FIXME: this also seems to be an issue with the raw XML, so ignore it for now
     error.message.include?("Element '{http://ands.org.au/standards/rif-cs/registryObjects}registryObjects': No matching global element declaration available, but demanded by the strict wildcard")
   end
 
@@ -309,9 +309,7 @@ if options[:use_saved_xml]
   saved_responses = Dir[File.join(options[:use_saved_xml], 'response_*.xml')].sort.map { |f| File.read(f) }
   save_to_xml(saved_responses, xml_filename, options[:split])
 else
-  if options[:save_xml]
-    save_raw_xml(harvester.raw_responses, options[:save_xml])
-  end
+  save_raw_xml(harvester.raw_responses, options[:save_xml]) if options[:save_xml]
 
   # Save combined and sorted XML
   save_to_xml(harvester.raw_responses, xml_filename, options[:split])
