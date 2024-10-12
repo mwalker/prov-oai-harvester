@@ -2,6 +2,10 @@ name: Harvest PROV OAI data
 
 on:
   push:
+    branches:
+      - 'main'
+    paths:
+      - 'harvest-prov-oai.rb'
   workflow_dispatch:
   schedule:
   - cron: '42 7 * * 6'
