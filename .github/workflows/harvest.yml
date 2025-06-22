@@ -24,16 +24,44 @@ jobs:
     - name: Harvest PROV OAI Data
       run: |
         bundle exec ruby harvest-prov-oai.rb --split
-    - name: Generate commit message
+    - name: Check for changes and generate commit message
       run: |
-        echo "$(date -u)" > /tmp/commit.txt
-        echo "" >> /tmp/commit.txt
-        uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-series.json" "prov-oai-series-$(date -I).json" >> /tmp/commit.txt
-        echo "" >> /tmp/commit.txt
-        uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-agencies.json" "prov-oai-agencies-$(date -I).json" >> /tmp/commit.txt
-        echo "" >> /tmp/commit.txt
-        uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-functions.json" "prov-oai-functions-$(date -I).json" >> /tmp/commit.txt
+        # Check if any csv-diff output indicates changes
+        CHANGES_FOUND=false
+
+        # Check series changes
+        SERIES_DIFF=$(uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-series.json" "prov-oai-series-$(date -I).json")
+        if [ "$SERIES_DIFF" != "[]" ] && [ -n "$SERIES_DIFF" ]; then
+          CHANGES_FOUND=true
+        fi
+
+        # Check agencies changes
+        AGENCIES_DIFF=$(uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-agencies.json" "prov-oai-agencies-$(date -I).json")
+        if [ "$AGENCIES_DIFF" != "[]" ] && [ -n "$AGENCIES_DIFF" ]; then
+          CHANGES_FOUND=true
+        fi
+
+        # Check functions changes
+        FUNCTIONS_DIFF=$(uv run --with csv-diff csv-diff --format=json --key=identifier "prov-oai-functions.json" "prov-oai-functions-$(date -I).json")
+        if [ "$FUNCTIONS_DIFF" != "[]" ] && [ -n "$FUNCTIONS_DIFF" ]; then
+          CHANGES_FOUND=true
+        fi
+
+        # Set output for next steps
+        echo "CHANGES_FOUND=$CHANGES_FOUND" >> $GITHUB_ENV
+
+        # Generate commit message only if changes found
+        if [ "$CHANGES_FOUND" = "true" ]; then
+          echo "$(date -u)" > /tmp/commit.txt
+          echo "" >> /tmp/commit.txt
+          echo "$SERIES_DIFF" >> /tmp/commit.txt
+          echo "" >> /tmp/commit.txt
+          echo "$AGENCIES_DIFF" >> /tmp/commit.txt
+          echo "" >> /tmp/commit.txt
+          echo "$FUNCTIONS_DIFF" >> /tmp/commit.txt
+        fi
     - name: Update data
+      if: env.CHANGES_FOUND == 'true'
       run: |
         mv "prov-oai-agencies-$(date -I).json" "prov-oai-agencies.json"
         mv "prov-oai-functions-$(date -I).json" "prov-oai-functions.json"
@@ -42,6 +70,7 @@ jobs:
         mv "prov-oai-functions-$(date -I).xml" "prov-oai-functions.xml"
         mv "prov-oai-series-$(date -I).xml" "prov-oai-series.xml"
     - name: Commit and push
+      if: env.CHANGES_FOUND == 'true'
       run: |
         git config user.name "Automated"
         git config user.email "actions@users.noreply.github.com"
